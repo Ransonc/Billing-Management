@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>老板经营驾驶舱 - 移动端</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: #f5f7fa;
+            width: 375px;
+            margin: 0 auto;
+        }
+        .phone-container {
+            width: 375px;
+            min-height: 812px;
+            background: #f5f7fa;
+            position: relative;
+            padding-bottom: 80px;
+        }
+        /* 顶部状态栏 */
+        .status-bar {
+            height: 44px;
+            background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        /* 头部区域 */
+        .header {
+            background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%);
+            padding: 0 20px 30px;
+            color: white;
+        }
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .greeting h1 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .greeting p {
+            font-size: 13px;
+            opacity: 0.85;
+        }
+        .header-icons {
+            display: flex;
+            gap: 16px;
+        }
+        .icon-btn {
+            width: 36px;
+            height: 36px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .badge {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 16px;
+            height: 16px;
+            background: #ff5252;
+            border-radius: 50%;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+        /* 核心数据卡片 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: -15px;
+            padding: 0 20px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .stat-card.highlight {
+            background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%);
+            color: white;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #8c9aad;
+            margin-bottom: 8px;
+        }
+        .stat-card.highlight .stat-label {
+            color: rgba(255,255,255,0.85);
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1a2b3c;
+        }
+        .stat-card.highlight .stat-value {
+            color: white;
+        }
+        .stat-trend {
+            font-size: 11px;
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .trend-up { color: #4caf50; }
+        .trend-down { color: #f44336; }
+        .stat-card.highlight .trend-up { color: #a5d6a7; }
+        /* 提醒区域 */
+        .section {
+            margin: 20px;
+        }
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a2b3c;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .section-title .more {
+            font-size: 12px;
+            color: #8c9aad;
+            font-weight: 400;
+        }
+        .alert-list {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .alert-item {
+            display: flex;
+            align-items: center;
+            padding: 14px 16px;
+            border-bottom: 1px solid #f0f2f5;
+        }
+        .alert-item:last-child {
+            border-bottom: none;
+        }
+        .alert-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-size: 16px;
+        }
+        .alert-icon.red { background: #ffebee; color: #f44336; }
+        .alert-icon.orange { background: #fff3e0; color: #ff9800; }
+        .alert-icon.yellow { background: #fffde7; color: #fdd835; }
+        .alert-icon.blue { background: #e3f2fd; color: #2196f3; }
+        .alert-content {
+            flex: 1;
+        }
+        .alert-title {
+            font-size: 14px;
+            color: #1a2b3c;
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+        .alert-desc {
+            font-size: 12px;
+            color: #8c9aad;
+        }
+        .alert-count {
+            font-size: 18px;
+            font-weight: 700;
+            color: #f44336;
+        }
+        /* 员工概览 */
+        .employee-overview {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .employee-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            text-align: center;
+        }
+        .emp-stat-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a2b3c;
+            margin-bottom: 4px;
+        }
+        .emp-stat-label {
+            font-size: 12px;
+            color: #8c9aad;
+        }
+        .divider {
+            width: 1px;
+            background: #f0f2f5;
+        }
+        /* 底部导航 */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 375px;
+            height: 70px;
+            background: white;
+            border-top: 1px solid #f0f2f5;
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            padding-bottom: 10px;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: #8c9aad;
+            font-size: 11px;
+        }
+        .nav-item.active {
+            color: #1e88e5;
+        }
+        .nav-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-container">
+        <!-- 状态栏 -->
+        <div class="status-bar">
+            <span>9:41</span>
+            <span>📶 🔋</span>
+        </div>
+
+        <!-- 头部 -->
+        <div class="header">
+            <div class="header-top">
+                <div class="greeting">
+                    <h1>早上好，张总</h1>
+                    <p>2026年10月14日 星期三</p>
+                </div>
+                <div class="header-icons">
+                    <div class="icon-btn">
+                        <span>🔍</span>
+                    </div>
+                    <div class="icon-btn">
+                        <span>🔔</span>
+                        <div class="badge">5</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 核心数据卡片 -->
+        <div class="stats-grid">
+            <div class="stat-card highlight">
+                <div class="stat-label">今日销售额</div>
+                <div class="stat-value">¥8,642</div>
+                <div class="stat-trend trend-up">↑ 12.5% 较昨日</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">本月销售额</div>
+                <div class="stat-value">¥186,320</div>
+                <div class="stat-trend trend-up">↑ 8.3% 较上月</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">本月毛利润</div>
+                <div class="stat-value">¥74,528</div>
+                <div class="stat-trend trend-up">↑ 5.2% 较上月</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">本月净利润</div>
+                <div class="stat-value">¥42,186</div>
+                <div class="stat-trend trend-down">↓ 2.1% 较上月</div>
+            </div>
+        </div>
+
+        <!-- 经营提醒 -->
+        <div class="section">
+            <div class="section-title">
+                经营提醒
+                <span class="more">查看全部 ›</span>
+            </div>
+            <div class="alert-list">
+                <div class="alert-item">
+                    <div class="alert-icon red">💰</div>
+                    <div class="alert-content">
+                        <div class="alert-title">待收欠款</div>
+                        <div class="alert-desc">12位客户待回款</div>
+                    </div>
+                    <div class="alert-count">¥38,560</div>
+                </div>
+                <div class="alert-item">
+                    <div class="alert-icon orange">📦</div>
+                    <div class="alert-content">
+                        <div class="alert-title">库存预警</div>
+                        <div class="alert-desc">3种药品低于安全库存</div>
+                    </div>
+                    <div class="alert-count" style="color:#ff9800;">3</div>
+                </div>
+                <div class="alert-item">
+                    <div class="alert-icon yellow">📊</div>
+                    <div class="alert-content">
+                        <div class="alert-title">客户消费异常</div>
+                        <div class="alert-desc">2位客户消费波动超阈值</div>
+                    </div>
+                    <div class="alert-count" style="color:#fdd835;">2</div>
+                </div>
+                <div class="alert-item">
+                    <div class="alert-icon blue">💧</div>
+                    <div class="alert-content">
+                        <div class="alert-title">水质异常</div>
+                        <div class="alert-desc">2号塘溶解氧偏低</div>
+                    </div>
+                    <div class="alert-count" style="color:#2196f3;">1</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 员工概览 -->
+        <div class="section">
+            <div class="section-title">
+                员工工作概览
+                <span class="more">详情 ›</span>
+            </div>
+            <div class="employee-overview">
+                <div class="employee-stats">
+                    <div>
+                        <div class="emp-stat-value">8/10</div>
+                        <div class="emp-stat-label">今日已打卡</div>
+                    </div>
+                    <div class="divider"></div>
+                    <div>
+                        <div class="emp-stat-value">6</div>
+                        <div class="emp-stat-label">外勤中</div>
+                    </div>
+                    <div class="divider"></div>
+                    <div>
+                        <div class="emp-stat-value">9</div>
+                        <div class="emp-stat-label">今日拜访</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部导航 -->
+        <div class="bottom-nav">
+            <div class="nav-item active">
+                <div class="nav-icon">🏠</div>
+                <span>首页</span>
+            </div>
+            <div class="nav-item">
+                <div class="nav-icon">👥</div>
+                <span>客户</span>
+            </div>
+            <div class="nav-item">
+                <div class="nav-icon">🐟</div>
+                <span>鱼塘</span>
+            </div>
+            <div class="nav-item">
+                <div class="nav-icon">📈</div>
+                <span>报表</span>
+            </div>
+            <div class="nav-item">
+                <div class="nav-icon">👤</div>
+                <span>我的</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

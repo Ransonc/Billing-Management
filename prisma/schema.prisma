@@ -1,0 +1,577 @@
+// Prisma schema - 水产养殖经营管理平台
+// 所有业务表通过 enterprise_id 实现多租户隔离
+// 配合 PostgreSQL Row Level Security (RLS) 强制数据隔离
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ 平台基础表 ============
+
+// 企业/租户
+model Enterprise {
+  id           String   @id @default(cuid())
+  name         String
+  contactName  String?
+  contactPhone String?
+  status       String   @default("active") // active / pending / inactive
+  subscription String   @default("free") // free / basic / premium
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  users         User[]
+  customers     Customer[]
+  fishPonds     FishPond[]
+  drugInventory DrugInventory[]
+  drugPurchase  DrugPurchase[]
+  drugSale      DrugSale[]
+  waterQuality  WaterQualityRecord[]
+  attendance    Attendance[]
+  fieldTrack    FieldTrack[]
+  customerVisit CustomerVisit[]
+  financeRecord FinanceRecord[]
+  debt          Debt[]
+  commission    CommissionRecord[]
+  dailyDeath    DailyDeath[]
+  feedRecord    FeedRecord[]
+  drugRecord    DrugRecord[]
+  fishStocking  FishStocking[]
+  saleRecord    SaleRecord[]
+  debtPayments  DebtPayment[]
+}
+
+// 用户表(四种角色)
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  phone        String?
+  name         String
+  role         String // super_admin / owner / employee / customer
+  enterpriseId String?
+  employeeId   String? // 当 role=customer 时关联
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  enterprise Enterprise? @relation(fields: [enterpriseId], references: [id], onDelete: SetNull)
+
+  @@index([enterpriseId])
+  @@index([role])
+}
+
+// 角色权限(平台级可配置)
+model RolePermission {
+  id        String   @id @default(cuid())
+  role      String
+  module    String // 模块名: customer / fish_pond / drug / sale / finance ...
+  canRead   Boolean  @default(false)
+  canCreate Boolean  @default(false)
+  canUpdate Boolean  @default(false)
+  canDelete Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([role, module])
+}
+
+// ============ 客户与鱼塘 ============
+
+model Customer {
+  id            String   @id @default(cuid())
+  enterpriseId  String
+  name          String
+  phone         String?
+  address       String?
+  contactPerson String?
+  status        String   @default("active") // active / inactive
+  notes         String?
+  createdById   String? // 创建员工
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  enterprise Enterprise      @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+  fishPonds  FishPond[]
+  drugSales  DrugSale[]
+  debts      Debt[]
+  visits     CustomerVisit[]
+
+  @@index([enterpriseId])
+}
+
+model FishPond {
+  id            String    @id @default(cuid())
+  enterpriseId  String
+  customerId    String?
+  name          String
+  area          Decimal? // 面积(亩)
+  waterDepth    Decimal? // 水深(米)
+  fishSpecies   String? // 养殖品种
+  stockDate     DateTime? // 投放日期
+  stockQuantity Int? // 投放数量
+  stockWeight   Decimal? // 投放重量(斤)
+  status        String    @default("active") // active / inactive / sold_out
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  enterprise     Enterprise           @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+  customer       Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  fishStockings  FishStocking[]
+  dailyDeaths    DailyDeath[]
+  feedRecords    FeedRecord[]
+  drugRecords    DrugRecord[]
+  saleRecords    SaleRecord[]
+  waterQualities WaterQualityRecord[]
+
+  @@index([enterpriseId])
+  @@index([customerId])
+}
+
+model FishStocking {
+  id           String   @id @default(cuid())
+  enterpriseId String
+  fishPondId   String
+  fishSpecies  String
+  quantity     Int
+  weight       Decimal? // 投放重量
+  unitPrice    Decimal?
+  totalCost    Decimal?
+  stockDate    DateTime
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  enterprise Enterprise @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+  fishPond   FishPond   @relation(fields: [fishPondId], references: [id], onDelete: Cascade)
+
+  @@index([enterpriseId])
+  @@index([fishPondId])
+}
+
+// ============ 养殖台账 ============
+
+model DailyDeath {
+  id            String   @id @default(cuid())
+  enterpriseId  String
+  fishPondId    String
+  deathDate     DateTime
+  quantity      Int
+  reason        String? // 死亡原因分类
+  notes         String?
+  attachmentUrl String?
+  createdAt     DateTime @default(now())
+
+  enterprise Enterprise @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+  fishPond   FishPond   @relation(fields: [fishPondId], references: [id], onDelete: Cascade)
+
+  @@index([enterpriseId])
+  @@index([fishPondId])
+  @@index([deathDate])
+}
+
+model FeedRecord {
+  id           String   @id @default(cuid())
+  enterpriseId String
+  fishPondId   String
+  brand        String
+  model        String?
+  bags         Int
+  unitPrice    Decimal?
+  totalCost    Decimal?
+  feedDate     DateTime
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  enterprise Enterprise @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+  fishPond   FishPond   @relation(fields: [fishPondId], references: [id], onDelete: Cascade)
+
+  @@index([enterpriseId])
+  @@index([fishPondId])
+}
+
+model DrugRecord {
+  id           String    @id @default(cuid())
+  enterpriseId String
+  fishPondId   String
+  drugName     String
+  drugId       String? // 关联药品库存
+  quantity     Decimal
+  cost         Decimal?
+  startDate    DateTime
+  endDate      DateTime?
+  periodDays   Int? // 使用周期天数
+  reason       String?
+  operatorId   String?
+  notes        String?
+  createdAt    DateTime  @default(now())
+
+  enterprise Enterprise @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+  fishPond   FishPond   @relation(fields: [fishPondId], references: [id], onDelete: Cascade)
+
+  @@index([enterpriseId])
+  @@index([fishPondId])
+}
+
+model SaleRecord {
+  id           String   @id @default(cuid())
+  enterpriseId String
+  fishPondId   String
+  fishSpecies  String
+  quantity     Int
+  weight       Decimal
+  unitPrice    Decimal
+  totalAmount  Decimal
+  saleDate     DateTime
+  buyerName    String?
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  enterprise Enterprise @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+  fishPond   FishPond   @relation(fields: [fishPondId], references: [id], onDelete: Cascade)
+
+  @@index([enterpriseId])
+  @@index([fishPondId])
+  @@index([saleDate])
+}
+
+// ============ 药品进销存 ============
+
+model DrugInventory {
+  id            String   @id @default(cuid())
+  enterpriseId  String
+  name          String
+  specification String? // 规格
+  unit          String // 单位
+  supplier      String?
+  purchasePrice Decimal?
+  salePrice     Decimal?
+  stockQuantity Int      @default(0)
+  safetyStock   Int      @default(0)
+  status        String   @default("active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  enterprise      Enterprise     @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+  purchaseRecords DrugPurchase[]
+  saleRecords     DrugSale[]
+
+  @@index([enterpriseId])
+}
+
+model DrugPurchase {
+  id           String   @id @default(cuid())
+  enterpriseId String
+  drugId       String
+  supplier     String
+  quantity     Int
+  unitPrice    Decimal
+  totalCost    Decimal
+  purchaseDate DateTime
+  operatorId   String?
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  enterprise Enterprise    @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+  drug       DrugInventory @relation(fields: [drugId], references: [id], onDelete: Cascade)
+
+  @@index([enterpriseId])
+}
+
+model DrugSale {
+  id            String   @id @default(cuid())
+  enterpriseId  String
+  drugId        String
+  customerId    String?
+  fishPondId    String? // 可空,客户可暂不关联鱼塘
+  quantity      Int
+  unitPrice     Decimal
+  totalAmount   Decimal
+  paidAmount    Decimal  @default(0)
+  debtAmount    Decimal  @default(0) // 自动计算 = totalAmount - paidAmount
+  paymentStatus String   @default("unpaid") // unpaid / partial / paid
+  saleDate      DateTime
+  operatorId    String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  enterprise Enterprise    @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+  drug       DrugInventory @relation(fields: [drugId], references: [id], onDelete: Cascade)
+  customer   Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([enterpriseId])
+  @@index([customerId])
+  @@index([saleDate])
+}
+
+// ============ 欠款与回款 ============
+
+model Debt {
+  id              String    @id @default(cuid())
+  enterpriseId    String
+  customerId      String
+  totalAmount     Decimal
+  paidAmount      Decimal   @default(0)
+  remainingAmount Decimal // 自动计算
+  status          String    @default("pending") // pending / partial / settled
+  signImageUrl    String? // 电子签名
+  signDate        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  enterprise Enterprise    @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+  customer   Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  payments   DebtPayment[]
+
+  @@index([enterpriseId])
+  @@index([customerId])
+}
+
+model DebtPayment {
+  id            String   @id @default(cuid())
+  enterpriseId  String
+  debtId        String
+  amount        Decimal
+  paymentDate   DateTime
+  paymentMethod String? // cash / bank / wechat / alipay
+  operatorId    String?
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  enterprise Enterprise @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+  debt       Debt       @relation(fields: [debtId], references: [id], onDelete: Cascade)
+
+  @@index([enterpriseId])
+  @@index([debtId])
+}
+
+// ============ 水质检测 ============
+
+model WaterQualityRecord {
+  id              String   @id @default(cuid())
+  enterpriseId    String
+  fishPondId      String?
+  recordDate      DateTime
+  temperature     Decimal? // 水温
+  ph              Decimal? // pH
+  dissolvedOxygen Decimal? // 溶解氧
+  ammonia         Decimal? // 氨氮
+  nitrite         Decimal? // 亚硝酸盐
+  source          String? // 设备ID / 人工录入
+  abnormal        Boolean  @default(false)
+  abnormalDetails String?
+  operatorId      String?
+  createdAt       DateTime @default(now())
+
+  enterprise Enterprise @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+  fishPond   FishPond?  @relation(fields: [fishPondId], references: [id], onDelete: SetNull)
+
+  @@index([enterpriseId])
+  @@index([fishPondId])
+  @@index([recordDate])
+}
+
+// 水质标准阈值(平台级,超管配置)
+model WaterQualityThreshold {
+  id          String   @id @default(cuid())
+  indicator   String // temperature / ph / dissolved_oxygen / ammonia / nitrite
+  minValue    Decimal
+  maxValue    Decimal
+  warningMin  Decimal?
+  warningMax  Decimal?
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+// ============ 员工考勤外勤 ============
+
+model Attendance {
+  id           String    @id @default(cuid())
+  enterpriseId String
+  userId       String
+  checkInTime  DateTime
+  checkOutTime DateTime?
+  checkInLat   Decimal?
+  checkInLng   Decimal?
+  checkInAddr  String?
+  checkOutLat  Decimal?
+  checkOutLng  Decimal?
+  checkOutAddr String?
+  status       String    @default("normal") // normal / late / early / missing
+  date         DateTime // 考勤日期
+  createdAt    DateTime  @default(now())
+
+  enterprise Enterprise @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+
+  @@index([enterpriseId])
+  @@index([userId])
+  @@index([date])
+}
+
+model FieldTrack {
+  id           String    @id @default(cuid())
+  enterpriseId String
+  userId       String
+  startTime    DateTime
+  endTime      DateTime?
+  duration     Int? // 外勤时长(分钟)
+  status       String    @default("active") // active / ended
+  createdAt    DateTime  @default(now())
+
+  enterprise       Enterprise        @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+  fieldTrackPoints FieldTrackPoint[]
+
+  @@index([enterpriseId])
+  @@index([userId])
+}
+
+model FieldTrackPoint {
+  id           String   @id @default(cuid())
+  fieldTrackId String
+  latitude     Decimal
+  longitude    Decimal
+  timestamp    DateTime
+  accuracy     Decimal?
+
+  fieldTrack FieldTrack @relation(fields: [fieldTrackId], references: [id], onDelete: Cascade)
+
+  @@index([fieldTrackId])
+}
+
+model CustomerVisit {
+  id           String    @id @default(cuid())
+  enterpriseId String
+  userId       String // 拜访员工
+  customerId   String
+  startTime    DateTime
+  endTime      DateTime?
+  purpose      String
+  result       String?
+  followUp     String?
+  nextFollowUp DateTime?
+  latitude     Decimal?
+  longitude    Decimal?
+  createdAt    DateTime  @default(now())
+
+  enterprise Enterprise @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([enterpriseId])
+  @@index([userId])
+  @@index([customerId])
+}
+
+// ============ 员工提成 ============
+
+model CommissionRecord {
+  id               String    @id @default(cuid())
+  enterpriseId     String
+  userId           String
+  periodMonth      String // 格式: 2026-10
+  salesAmount      Decimal   @default(0)
+  commissionRate   Decimal?
+  commissionAmount Decimal   @default(0)
+  status           String    @default("pending") // pending / confirmed / paid
+  confirmedAt      DateTime?
+  paidAt           DateTime?
+  createdAt        DateTime  @default(now())
+
+  enterprise Enterprise @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+
+  @@unique([enterpriseId, userId, periodMonth])
+  @@index([enterpriseId])
+  @@index([userId])
+  @@index([periodMonth])
+}
+
+// 提成规则
+model CommissionRule {
+  id           String   @id @default(cuid())
+  enterpriseId String? // null 表示平台默认规则
+  name         String
+  drugId       String? // null 表示全部药品通用
+  minAmount    Decimal?
+  maxAmount    Decimal?
+  rate         Decimal
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@index([enterpriseId])
+}
+
+// ============ 财务 ============
+
+model FinanceRecord {
+  id           String   @id @default(cuid())
+  enterpriseId String
+  type         String // income / expense
+  category     String // sales / drug_purchase / salary / rent / water_electric / commission / other
+  amount       Decimal
+  description  String?
+  recordDate   DateTime
+  relatedId    String? // 关联业务ID
+  relatedType  String? // 关联业务类型:sale / purchase / commission ...
+  operatorId   String?
+  createdAt    DateTime @default(now())
+
+  enterprise Enterprise @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+
+  @@index([enterpriseId])
+  @@index([type])
+  @@index([category])
+  @@index([recordDate])
+}
+
+// ============ 水产品批发行情 ============
+
+model MarketPrice {
+  id            String   @id @default(cuid())
+  species       String // 品种,如:草鱼、鲫鱼
+  specification String? // 规格,如:1-3斤
+  minPrice      Decimal?
+  maxPrice      Decimal?
+  avgPrice      Decimal?
+  priceDate     DateTime
+  source        String?
+  createdAt     DateTime @default(now())
+
+  @@index([species])
+  @@index([priceDate])
+}
+
+// 行情订阅
+model MarketSubscription {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  enterpriseId String?
+  plan         String // monthly / quarterly / yearly
+  startDate    DateTime
+  endDate      DateTime
+  status       String   @default("active") // active / expired
+  createdAt    DateTime @default(now())
+}
+
+// ============ 操作日志 ============
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  userEmail    String?
+  enterpriseId String?
+  action       String // create / update / delete / login / export ...
+  module       String
+  targetId     String?
+  targetType   String?
+  oldValue     Json?
+  newValue     Json?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  @@index([enterpriseId])
+  @@index([userId])
+  @@index([createdAt])
+}
